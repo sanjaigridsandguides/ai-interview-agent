@@ -37,18 +37,7 @@ def generate_agent_flow_image(output_path: str = "agent_flow.png") -> None:
         logger.info("Agent flow diagram saved to: %s", os.path.abspath(output_path))
 
     except Exception as exc:
-        logger.warning("PNG generation failed (%s) — saving Mermaid source instead", exc)
-
-        mermaid_source: str = graph.get_graph().draw_mermaid()
-        fallback_path = output_path.replace(".png", ".md")
-
-        with open(fallback_path, "w") as f:
-            f.write("# AI Interview Agent — Graph Flow\n\n")
-            f.write("```mermaid\n")
-            f.write(mermaid_source)
-            f.write("\n```\n")
-
-        logger.info("Mermaid diagram source saved to: %s", os.path.abspath(fallback_path))
+        logger.warning("PNG generation failed", exc)
 
 
 if __name__ == "__main__":
