@@ -26,10 +26,6 @@ data/
 *.log
 logs/
 
-# Generated assets
-agent_flow.png
-agent_flow.md
-
 # IDE
 .vscode/
 .idea/
