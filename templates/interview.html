@@ -1,0 +1,479 @@
+{% extends "base.html" %}
+
+{% block title %}AI Interview — Live Session{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex flex-col bg-gray-50">
+
+  <!-- ── Top bar ── -->
+  <header class="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0 shadow-sm">
+    <div class="flex items-center gap-2.5">
+      <div class="w-8 h-8 rounded-lg bg-cyan-500 flex items-center justify-center text-white">
+        <i data-lucide="bot" class="w-4 h-4"></i>
+      </div>
+      <span class="font-semibold text-gray-900">AI Interview Agent</span>
+    </div>
+
+    <!-- Progress dots -->
+    <div class="flex items-center gap-2.5">
+      <span class="text-sm text-gray-400">Question</span>
+      <div class="flex gap-1.5" id="progress-dots">
+        {% for i in range(1, 7) %}
+        <div class="w-2.5 h-2.5 rounded-full bg-gray-200" id="dot-{{ i }}"></div>
+        {% endfor %}
+      </div>
+      <span class="text-sm font-semibold text-gray-700" id="progress-label">1 / 6</span>
+    </div>
+
+    <!-- Bloom's taxonomy badge -->
+    <span id="taxonomy-badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-cyan-50 text-cyan-700 border border-cyan-200">
+      Bloom's Level 1 — Remember
+    </span>
+  </header>
+
+  <!-- ── Main layout ── -->
+  <main class="flex flex-1 overflow-hidden">
+
+    <!-- Left sidebar — app icon only -->
+    <aside class="w-16 bg-white border-r border-gray-200 flex flex-col items-center py-5 gap-4 shrink-0">
+      <div class="w-10 h-10 rounded-xl bg-cyan-500 flex items-center justify-center text-white shadow-sm">
+        <i data-lucide="bot" class="w-5 h-5"></i>
+      </div>
+      <!-- Progress pips (vertical) -->
+      <div class="flex flex-col gap-2 mt-2" id="side-pips">
+        {% for i in range(1, 7) %}
+        <div class="w-2 h-2 rounded-full bg-gray-200 mx-auto" id="pip-{{ i }}"></div>
+        {% endfor %}
+      </div>
+    </aside>
+
+    <!-- Right panel: conversation + input -->
+    <section class="flex-1 flex flex-col overflow-hidden">
+
+      <!-- Conversation history -->
+      <div class="flex-1 overflow-y-auto p-6 space-y-5" id="conversation"></div>
+
+      <!-- Divider -->
+      <div class="border-t border-gray-200"></div>
+
+      <!-- Input toolbar -->
+      <div class="bg-white px-5 py-4">
+
+        <!-- Transcription preview -->
+        <div id="transcription-preview" class="hidden mb-3 bg-cyan-50 rounded-xl px-4 py-3 border border-cyan-200">
+          <p class="text-xs font-medium text-cyan-600 mb-1">TRANSCRIBED ANSWER</p>
+          <p class="text-sm text-gray-800" id="transcription-text"></p>
+        </div>
+
+        <!-- Controls row -->
+        <div class="flex items-center gap-3">
+
+          <!-- Mic button -->
+          <button
+            id="mic-btn"
+            disabled
+            title="Click to record your answer"
+            class="w-11 h-11 rounded-full bg-cyan-500 hover:bg-cyan-600 text-white flex items-center justify-center shadow-sm disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+          >
+            <i data-lucide="mic" class="w-5 h-5" id="mic-icon"></i>
+          </button>
+
+          <!-- Status text -->
+          <div class="flex-1 min-w-0">
+            <div id="recording-status" class="hidden items-center gap-2 text-red-500 text-sm">
+              <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0"></span>
+              <span>Recording…</span>
+            </div>
+            <div id="transcribing-status" class="hidden items-center gap-2 text-amber-500 text-sm">
+              <i data-lucide="loader-2" class="w-4 h-4 animate-spin shrink-0"></i>
+              <span>Transcribing…</span>
+            </div>
+            <p id="input-hint" class="text-sm text-gray-400">Waiting for question…</p>
+          </div>
+
+          <!-- Send button -->
+          <button
+            id="send-btn"
+            disabled
+            class="flex items-center gap-2 px-5 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-semibold rounded-xl shadow-sm disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+          >
+            <span>Send Answer</span>
+            <i data-lucide="send" class="w-4 h-4"></i>
+          </button>
+
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- ── Loading overlay ── -->
+  <div id="loading-overlay" class="fixed inset-0 bg-white/75 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="text-center">
+      <div class="w-14 h-14 rounded-2xl bg-cyan-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
+        <i data-lucide="loader-2" class="w-7 h-7 text-white animate-spin"></i>
+      </div>
+      <p class="text-gray-700 font-medium" id="overlay-text">Starting interview…</p>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // ── SVG icon strings (used when building message bubbles dynamically) ──────
+  const ICON = {
+    play:  `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
+    pause: `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`,
+    bot:   `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>`,
+    user:  `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+  };
+
+  // ── Constants ──────────────────────────────────────────────────────────────
+  const SESSION_ID = "{{ session_id }}";
+  const TOTAL_QUESTIONS = 6;
+  const TAXONOMY_LABELS = [
+    'Level 1 — Remember', 'Level 2 — Understand', 'Level 3 — Apply',
+    'Level 4 — Analyze',  'Level 5 — Evaluate',   'Level 6 — Create',
+  ];
+  const TAXONOMY_COLORS = [
+    'bg-blue-50 text-blue-700 border-blue-200',
+    'bg-cyan-50 text-cyan-700 border-cyan-200',
+    'bg-emerald-50 text-emerald-700 border-emerald-200',
+    'bg-amber-50 text-amber-700 border-amber-200',
+    'bg-orange-50 text-orange-700 border-orange-200',
+    'bg-rose-50 text-rose-700 border-rose-200',
+  ];
+
+  // ── DOM references ─────────────────────────────────────────────────────────
+  const conversation       = document.getElementById('conversation');
+  const micBtn             = document.getElementById('mic-btn');
+  const micIcon            = document.getElementById('mic-icon');
+  const sendBtn            = document.getElementById('send-btn');
+  const taxonomyBadge      = document.getElementById('taxonomy-badge');
+  const progressLabel      = document.getElementById('progress-label');
+  const loadingOverlay     = document.getElementById('loading-overlay');
+  const overlayText        = document.getElementById('overlay-text');
+  const transcriptionPreview = document.getElementById('transcription-preview');
+  const transcriptionText  = document.getElementById('transcription-text');
+  const recordingStatus    = document.getElementById('recording-status');
+  const transcribingStatus = document.getElementById('transcribing-status');
+  const inputHint          = document.getElementById('input-hint');
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  let mediaRecorder    = null;
+  let audioChunks      = [];
+  let isRecording      = false;
+  let pendingText      = null;   // transcribed answer text
+  let pendingAudioUrl  = null;   // blob URL of the recorded audio (for playback)
+
+  // ── Progress ───────────────────────────────────────────────────────────────
+  function updateProgress(questionNo) {
+    progressLabel.textContent = `${questionNo} / ${TOTAL_QUESTIONS}`;
+
+    for (let i = 1; i <= TOTAL_QUESTIONS; i++) {
+      const dot = document.getElementById(`dot-${i}`);
+      const pip = document.getElementById(`pip-${i}`);
+      if (i < questionNo) {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-cyan-500';
+        pip.className = 'w-2 h-2 rounded-full bg-cyan-400 mx-auto';
+      } else if (i === questionNo) {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-cyan-600 ring-2 ring-cyan-200';
+        pip.className = 'w-2 h-2 rounded-full bg-cyan-600 mx-auto ring-1 ring-cyan-200';
+      } else {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-gray-200';
+        pip.className = 'w-2 h-2 rounded-full bg-gray-200 mx-auto';
+      }
+    }
+
+    const color = TAXONOMY_COLORS[questionNo - 1] || '';
+    taxonomyBadge.textContent = `Bloom's ${TAXONOMY_LABELS[questionNo - 1] || ''}`;
+    taxonomyBadge.className = `px-3 py-1 rounded-full text-xs font-semibold border ${color}`;
+  }
+
+  // ── Overlay ────────────────────────────────────────────────────────────────
+  function showOverlay(text) {
+    overlayText.textContent = text;
+    loadingOverlay.classList.remove('hidden');
+    lucide.createIcons();
+  }
+  function hideOverlay() { loadingOverlay.classList.add('hidden'); }
+
+  // ── Audio player widget ────────────────────────────────────────────────────
+  // Creates a small Play / Pause pill button attached to a message bubble.
+  function createAudioPlayer(audioSrc, isAI) {
+    const audio = new Audio(audioSrc);
+    const wrapper = document.createElement('div');
+    wrapper.className = 'mt-2.5 flex items-center gap-2';
+
+    const btn = document.createElement('button');
+    const pillBase = isAI
+      ? 'bg-cyan-100 text-cyan-700 hover:bg-cyan-200 border border-cyan-200'
+      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200';
+    btn.className = `flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${pillBase}`;
+
+    const durationSpan = document.createElement('span');
+    durationSpan.className = 'text-xs text-gray-400';
+
+    let playing = false;
+
+    function refreshBtn() {
+      btn.innerHTML = playing
+        ? `${ICON.pause}<span>Pause</span>`
+        : `${ICON.play}<span>Play</span>`;
+    }
+
+    refreshBtn();
+
+    btn.addEventListener('click', () => {
+      if (playing) {
+        audio.pause();
+      } else {
+        // Pause every other audio on the page before playing this one
+        document.querySelectorAll('audio[data-interview]').forEach(a => a.pause());
+        audio.play().catch(() => {});
+      }
+    });
+
+    audio.addEventListener('play',  () => { playing = true;  refreshBtn(); });
+    audio.addEventListener('pause', () => { playing = false; refreshBtn(); });
+    audio.addEventListener('ended', () => { playing = false; refreshBtn(); });
+
+    audio.addEventListener('loadedmetadata', () => {
+      const s = Math.round(audio.duration);
+      durationSpan.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    });
+
+    // Tag the audio element so we can pause-all
+    audio.setAttribute('data-interview', '1');
+
+    wrapper.appendChild(btn);
+    wrapper.appendChild(durationSpan);
+    return wrapper;
+  }
+
+  // ── Append a message bubble to the conversation ────────────────────────────
+  function appendMessage(role, text, audioSrc = null) {
+    const isAI = role === 'ai';
+
+    const row = document.createElement('div');
+    row.className = `flex gap-3 items-start ${isAI ? '' : 'flex-row-reverse'}`;
+
+    // Avatar circle
+    const avatar = document.createElement('div');
+    avatar.className = `w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm ${
+      isAI ? 'bg-cyan-500 text-white' : 'bg-gray-200 text-gray-600'
+    }`;
+    avatar.innerHTML = isAI ? ICON.bot : ICON.user;
+
+    // Bubble
+    const bubble = document.createElement('div');
+    bubble.className = `max-w-xl px-4 py-3 rounded-2xl shadow-sm text-sm ${
+      isAI
+        ? 'bg-cyan-50 border border-cyan-200 text-gray-800 rounded-tl-sm'
+        : 'bg-white border border-gray-200 text-gray-800 rounded-tr-sm'
+    }`;
+
+    const textEl = document.createElement('p');
+    textEl.className = 'leading-relaxed';
+    textEl.textContent = text;
+    bubble.appendChild(textEl);
+
+    // Attach play/pause player if audio is provided
+    if (audioSrc) {
+      bubble.appendChild(createAudioPlayer(audioSrc, isAI));
+    }
+
+    row.appendChild(avatar);
+    row.appendChild(bubble);
+    conversation.appendChild(row);
+    conversation.scrollTop = conversation.scrollHeight;
+  }
+
+  // ── Fetch TTS audio and return a data URL ─────────────────────────────────
+  async function fetchTTSAudio(text) {
+    const res = await fetch('/text-to-speech', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) throw new Error('TTS request failed');
+    const { audio_base64 } = await res.json();
+    return `data:audio/wav;base64,${audio_base64}`;
+  }
+
+  // ── Recording ─────────────────────────────────────────────────────────────
+  micBtn.addEventListener('click', async () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      await startRecording();
+    }
+  });
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunks = [];
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+      mediaRecorder.onstop = handleRecordingStop;
+      mediaRecorder.start();
+      isRecording = true;
+
+      // UI: recording state
+      micBtn.classList.replace('bg-cyan-500', 'bg-red-500');
+      micBtn.classList.replace('hover:bg-cyan-600', 'hover:bg-red-600');
+      micIcon.setAttribute('data-lucide', 'square');
+      lucide.createIcons();
+      recordingStatus.classList.remove('hidden');
+      recordingStatus.classList.add('flex');
+      inputHint.classList.add('hidden');
+      transcriptionPreview.classList.add('hidden');
+      sendBtn.disabled = true;
+      pendingText = null;
+      pendingAudioUrl = null;
+    } catch {
+      alert('Microphone access is required. Please allow microphone permission and try again.');
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      mediaRecorder.stream.getTracks().forEach(t => t.stop());
+      isRecording = false;
+
+      // UI: restore mic button
+      micBtn.classList.replace('bg-red-500', 'bg-cyan-500');
+      micBtn.classList.replace('hover:bg-red-600', 'hover:bg-cyan-600');
+      micIcon.setAttribute('data-lucide', 'mic');
+      lucide.createIcons();
+      recordingStatus.classList.add('hidden');
+      recordingStatus.classList.remove('flex');
+    }
+  }
+
+  async function handleRecordingStop() {
+    // Show transcribing spinner
+    transcribingStatus.classList.remove('hidden');
+    transcribingStatus.classList.add('flex');
+    inputHint.classList.add('hidden');
+
+    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+    // Create a local URL so we can play the recording back in the chat bubble
+    pendingAudioUrl = URL.createObjectURL(audioBlob);
+
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'answer.webm');
+
+    try {
+      const res = await fetch('/speech-to-text', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error('STT failed');
+      const { text } = await res.json();
+
+      transcribingStatus.classList.add('hidden');
+      transcribingStatus.classList.remove('flex');
+
+      if (text && text.trim()) {
+        pendingText = text.trim();
+        transcriptionText.textContent = pendingText;
+        transcriptionPreview.classList.remove('hidden');
+        sendBtn.disabled = false;
+        inputHint.textContent = 'Review your answer above, then click Send Answer';
+        inputHint.classList.remove('hidden');
+      } else {
+        inputHint.textContent = 'Could not transcribe — please try recording again';
+        inputHint.classList.remove('hidden');
+      }
+    } catch {
+      transcribingStatus.classList.add('hidden');
+      transcribingStatus.classList.remove('flex');
+      inputHint.textContent = 'Transcription failed — please try again';
+      inputHint.classList.remove('hidden');
+    }
+  }
+
+  // ── Send answer ───────────────────────────────────────────────────────────
+  sendBtn.addEventListener('click', async () => {
+    if (!pendingText) return;
+
+    const answerText = pendingText;
+    const answerAudioUrl = pendingAudioUrl;
+    pendingText = null;
+    pendingAudioUrl = null;
+
+    sendBtn.disabled = true;
+    micBtn.disabled = true;
+    transcriptionPreview.classList.add('hidden');
+    inputHint.classList.add('hidden');
+
+    // Show the user's answer in the chat with playback of their recording
+    appendMessage('user', answerText, answerAudioUrl);
+
+    showOverlay('Evaluating your answer…');
+
+    try {
+      const res = await fetch(`/interview/answer/${SESSION_ID}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answer_text: answerText }),
+      });
+      if (!res.ok) throw new Error('Failed to submit answer');
+      const data = await res.json();
+      hideOverlay();
+
+      if (data.is_complete) {
+        showOverlay('Generating your report…');
+        setTimeout(() => { window.location.href = `/report/${SESSION_ID}`; }, 1200);
+        return;
+      }
+
+      // Fetch TTS for the next question then show it in the chat
+      updateProgress(data.question_no);
+      let ttsUrl = null;
+      try { ttsUrl = await fetchTTSAudio(data.question_text); } catch { /* audio optional */ }
+      appendMessage('ai', data.question_text, ttsUrl);
+
+      micBtn.disabled = false;
+      inputHint.textContent = 'Click the mic to record your answer';
+      inputHint.classList.remove('hidden');
+
+    } catch {
+      hideOverlay();
+      appendMessage('ai', '⚠️ Something went wrong. Please try recording your answer again.');
+      micBtn.disabled = false;
+      sendBtn.disabled = false;
+    }
+  });
+
+  // ── Start interview on page load ──────────────────────────────────────────
+  async function startInterview() {
+    showOverlay('Starting interview…');
+
+    try {
+      const res = await fetch(`/interview/start/${SESSION_ID}`, { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to start interview');
+      const data = await res.json();
+      hideOverlay();
+
+      updateProgress(data.question_no);
+
+      let ttsUrl = null;
+      try { ttsUrl = await fetchTTSAudio(data.question_text); } catch { /* audio optional */ }
+      appendMessage('ai', data.question_text, ttsUrl);
+
+      micBtn.disabled = false;
+      inputHint.textContent = 'Click the mic to record your answer';
+      inputHint.classList.remove('hidden');
+
+    } catch {
+      hideOverlay();
+      appendMessage('ai', '⚠️ Failed to load your first question. Please refresh the page.');
+    }
+  }
+
+  window.addEventListener('DOMContentLoaded', startInterview);
+</script>
+{% endblock %}

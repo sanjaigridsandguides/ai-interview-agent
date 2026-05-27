@@ -1,0 +1,35 @@
+[project]
+name = "ai-interview-agent"
+version = "1.0.0"
+description = "AI-powered interview agent using LangGraph, Groq LLM, and Sarvam AI TTS/STT"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "langgraph>=0.2.0",
+    "langchain>=0.3.0",
+    "langchain-groq>=0.2.0",
+    "langchain-core>=0.3.0",
+    "jinja2>=3.1.4",
+    "python-multipart>=0.0.9",
+    "httpx>=0.27.0",
+    "pydantic>=2.8.0",
+    "pydantic-settings>=2.4.0",
+    "python-dotenv>=1.0.0",
+    "aiofiles>=24.1.0",
+    "aiosqlite>=0.20.0",
+]
+
+[tool.uv]
+# This is an application, not an installable library.
+# Setting package = false tells uv to skip the build step and just install dependencies.
+package = false
+dev-dependencies = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.23.0",
+    "httpx>=0.27.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

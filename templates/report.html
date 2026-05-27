@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Interview Report — {{ session.name }}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-sky-50 px-4 py-10">
+  <div class="max-w-3xl mx-auto space-y-5">
+
+    <!-- ── Page header ── -->
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-lg bg-cyan-500 flex items-center justify-center text-white shadow-sm">
+          <i data-lucide="bot" class="w-4 h-4"></i>
+        </div>
+        <span class="text-sm font-semibold text-gray-500 uppercase tracking-widest">AI Interview Agent</span>
+      </div>
+      <a href="/" class="flex items-center gap-1.5 text-sm text-cyan-600 hover:text-cyan-700 font-medium">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+        New Interview
+      </a>
+    </div>
+
+    <!-- ── Candidate summary ── -->
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+      <div class="flex items-start justify-between flex-wrap gap-4">
+
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">{{ session.name }}</h1>
+          <p class="text-gray-500 mt-0.5">{{ session.job_role }}</p>
+          <div class="flex flex-wrap gap-2 mt-3">
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-600 border border-gray-200">
+              <i data-lucide="graduation-cap" class="w-3 h-3"></i>{{ session.highest_qualification }}
+            </span>
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-600 border border-gray-200">
+              <i data-lucide="briefcase" class="w-3 h-3"></i>{{ session.experience }}
+            </span>
+            {% for skill in session.skills_set.split(',') %}
+            <span class="px-2.5 py-1 rounded-full text-xs bg-cyan-50 text-cyan-700 border border-cyan-200">{{ skill.strip() }}</span>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Score + recommendation -->
+        <div class="flex flex-col items-center gap-2">
+          <div class="text-4xl font-bold text-gray-900">
+            {{ "%.1f"|format(session.overall_score or 0) }}<span class="text-lg text-gray-400 font-normal">/10</span>
+          </div>
+          {% set rec = session.hire_recommendation or 'Pending' %}
+          {% if rec == 'Strongly Recommend' %}
+            {% set badge = 'bg-emerald-50 text-emerald-700 border-emerald-200' %}
+            {% set icon = 'check-circle-2' %}
+          {% elif rec == 'Recommend' %}
+            {% set badge = 'bg-green-50 text-green-700 border-green-200' %}
+            {% set icon = 'thumbs-up' %}
+          {% elif rec == 'Neutral' %}
+            {% set badge = 'bg-amber-50 text-amber-700 border-amber-200' %}
+            {% set icon = 'minus-circle' %}
+          {% else %}
+            {% set badge = 'bg-red-50 text-red-700 border-red-200' %}
+            {% set icon = 'x-circle' %}
+          {% endif %}
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold border {{ badge }}">
+            <i data-lucide="{{ icon }}" class="w-4 h-4"></i>{{ rec }}
+          </span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Score progress bar ── -->
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+      <div class="flex justify-between mb-2">
+        <span class="text-sm font-medium text-gray-600">Overall Performance</span>
+        <span class="text-sm text-gray-400">{{ "%.1f"|format(session.overall_score or 0) }} / 10</span>
+      </div>
+      {% set pct = ((session.overall_score or 0) / 10 * 100) | int %}
+      {% if pct >= 80 %}{% set bar = 'bg-emerald-400' %}
+      {% elif pct >= 65 %}{% set bar = 'bg-green-400' %}
+      {% elif pct >= 50 %}{% set bar = 'bg-amber-400' %}
+      {% else %}{% set bar = 'bg-red-400' %}{% endif %}
+      <div class="w-full bg-gray-100 rounded-full h-2.5">
+        <div class="{{ bar }} h-2.5 rounded-full" style="width: {{ pct }}%"></div>
+      </div>
+    </div>
+
+    <!-- ── Q&A breakdown ── -->
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+        <i data-lucide="message-square-text" class="w-4 h-4 text-cyan-500"></i>
+        <h2 class="font-semibold text-gray-900">Interview Transcript</h2>
+        <span class="ml-auto text-xs text-gray-400">6 questions · Bloom's Taxonomy</span>
+      </div>
+
+      {% set level_colors = [
+        'bg-blue-50 text-blue-700 border-blue-200',
+        'bg-cyan-50 text-cyan-700 border-cyan-200',
+        'bg-emerald-50 text-emerald-700 border-emerald-200',
+        'bg-amber-50 text-amber-700 border-amber-200',
+        'bg-orange-50 text-orange-700 border-orange-200',
+        'bg-rose-50 text-rose-700 border-rose-200',
+      ] %}
+
+      <div class="divide-y divide-gray-100">
+        {% for qa in qa_pairs %}
+        {% set idx = loop.index0 %}
+        {% set score_pct = ((qa.score or 0) / 10 * 100) | int %}
+        {% if score_pct >= 80 %}{% set sc = 'text-emerald-600' %}
+        {% elif score_pct >= 65 %}{% set sc = 'text-green-600' %}
+        {% elif score_pct >= 50 %}{% set sc = 'text-amber-600' %}
+        {% else %}{% set sc = 'text-red-500' %}{% endif %}
+
+        <div class="p-5 hover:bg-gray-50">
+
+          <!-- Q header row -->
+          <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <div class="flex items-center gap-2.5">
+              <span class="w-6 h-6 rounded-full bg-cyan-500 text-white flex items-center justify-center text-xs font-bold shrink-0">{{ qa.question_no }}</span>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-medium border {{ level_colors[idx % 6] }}">{{ qa.taxonomy_level }}</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="text-2xl font-bold {{ sc }}">{{ "%.1f"|format(qa.score or 0) }}</span>
+              <span class="text-gray-400 text-sm">/10</span>
+            </div>
+          </div>
+
+          <!-- Question -->
+          <div class="mb-2.5">
+            <p class="text-xs font-medium text-gray-400 mb-1 flex items-center gap-1">
+              <i data-lucide="bot" class="w-3 h-3"></i> QUESTION
+            </p>
+            <p class="text-sm text-gray-700 bg-cyan-50 border border-cyan-100 rounded-lg px-3 py-2 leading-relaxed">{{ qa.question }}</p>
+          </div>
+
+          <!-- Answer -->
+          <div class="mb-2.5">
+            <p class="text-xs font-medium text-gray-400 mb-1 flex items-center gap-1">
+              <i data-lucide="user" class="w-3 h-3"></i> CANDIDATE'S ANSWER
+            </p>
+            <p class="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 leading-relaxed">{{ qa.answer }}</p>
+          </div>
+
+          <!-- Feedback -->
+          {% if qa.feedback %}
+          <div>
+            <p class="text-xs font-medium text-gray-400 mb-1 flex items-center gap-1">
+              <i data-lucide="message-circle" class="w-3 h-3"></i> EVALUATOR FEEDBACK
+            </p>
+            <p class="text-sm text-gray-500 italic leading-relaxed">{{ qa.feedback }}</p>
+          </div>
+          {% endif %}
+
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- ── Footer ── -->
+    <p class="text-center text-xs text-gray-400 pb-4">
+      Generated by AI Interview Agent · Powered by LangGraph &amp; Groq
+    </p>
+
+  </div>
+</div>
+{% endblock %}
